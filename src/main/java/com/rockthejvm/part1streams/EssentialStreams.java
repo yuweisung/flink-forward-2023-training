@@ -2,11 +2,13 @@ package com.rockthejvm.part1streams;
 
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.serialization.SimpleStringEncoder;
 import org.apache.flink.connector.file.sink.FileSink;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSink;
+import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.Collector;
 
@@ -130,8 +132,35 @@ public class EssentialStreams {
   }
 
 
+  public static void demoOtherTransformations() throws Exception {
+    StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+    env.setParallelism(2);
+    DataStream<Long> numbers = env.fromSequence(1, 100);
+
+    KeyedStream<Long, Boolean> keyedNumbers = numbers.keyBy(e -> e % 2 == 0);
+
+    // reduce by key
+    DataStream<Long> sumByKey = keyedNumbers.reduce(new ReduceFunction<Long>() {
+      @Override
+      public Long reduce(Long a, Long b) throws Exception {
+        return a + b;
+      }
+    });
+
+    // 1,2,3,4,5,6,7,8,9,10..
+    // true => 2, 6, 12, ...
+    // false => 1, 4, 9,
+
+    sumByKey.print();
+    sumByKey.sinkTo(FileSink.forRowFormat(
+      new Path("output/reduce"),
+      new SimpleStringEncoder<Long>("UTF-8")
+    ).build());
+
+    env.execute();
+  }
 
   public static void main(String[] args) throws Exception {
-    fizzbuzz();
+    demoOtherTransformations();
   }
 }
